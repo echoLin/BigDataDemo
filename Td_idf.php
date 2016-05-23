@@ -4,12 +4,14 @@ class Td_idf{
     private $csvFile;
     private $dataDir;
     private $resultFile;
+    private $appendenceFile;
     private $uselessWords;
-    function __construct($dir, $csvFile, $dataDir, $resultFile){
+    function __construct($dir, $csvFile, $dataDir, $resultFile, $appendenceFile){
         $this->dir = $dir;
         $this->csvFile = $csvFile;
         $this->dataDir = $dataDir;
         $this->resultFile = $resultFile;
+        $this->appendenceFile = $appendenceFile;
         $handle = fopen('uselessWords.txt', 'r');
         while(!feof($handle))
             $this->uselessWords[] = trim(fgets($handle));
@@ -21,7 +23,7 @@ class Td_idf{
      * @param  int $type 读取类型 1.全部 2.摘要
      * @return         
      */
-    public function readCSV($type = 1){
+    public function readCSV($type = 2){
         //1.读取论文的id
         $handle = fopen($this->dir.$this->csvFile,'r');
         fgetcsv($handle, 1000, ',');
@@ -32,8 +34,11 @@ class Td_idf{
         //根据读取type读取每篇论文并记录返回的词组
         $txtCount = count($paper);
         $wordCount = 0;
+        $appendence = array();
         foreach($paper as $id){
             $temp = $this->readPaper($id, $type);
+            //var_dump($temp);
+            //exit();
             foreach($temp as $key=>$value){
                 //var_dump($key , $value);
                 if(isset($resultData[$key])){
@@ -42,6 +47,7 @@ class Td_idf{
                 }else{
                     $resultData[$key] = array($value,1);
                 }
+                $appendence[$key][] = $id;
                 $wordCount += $value;
             }
         }
@@ -52,8 +58,31 @@ class Td_idf{
             fputcsv($file, array($key, ($value[0]/$wordCount)/log10($txtCount/$value[1])));
         }
         fclose($file);
+        $file = fopen($this->dir.$this->appendenceFile, 'w');
+        $first = array('key');
+        foreach($paper as $id){
+            $first[] = $id;
+        }
+        fputcsv($file, $first);
+        foreach($appendence as $key => $arr){
+            $row = array($key);
+            foreach($paper as $id){
+                if(in_array($id, $arr))
+                    $row[] = 1;
+                else
+                    $row[] = 0;
+            }
+            fputcsv($file, $row);
+        }
+        fclose($file);
     }
 
+    /**
+     * 读取论文
+     * @param  int $id   论文ID
+     * @param  int $type 1读取全部 2读取摘要
+     * @return array       
+     */
     private function readPaper($id, $type){
         if(!file_exists($this->dir.$this->dataDir.$id.'.txt')){
             return;
